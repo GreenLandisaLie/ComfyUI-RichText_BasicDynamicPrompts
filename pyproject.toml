@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-richtext_basicdynamicprompts"
+description = "Basic Dynamic Prompts functionality with a Rich Text texbox for coloring."
+version = "1.0.0"
+license = { file = "LICENSE.md" }
+
+[project.urls]
+Repository = "https://github.com/GreenLandisaLie/ComfyUI-RichText_BasicDynamicPrompts"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = "greenlandisalie"
+DisplayName = "ComfyUI-RichText_BasicDynamicPrompts"
+Icon = ""

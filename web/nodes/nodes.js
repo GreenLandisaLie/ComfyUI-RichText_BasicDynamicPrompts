@@ -141,13 +141,6 @@ app.registerExtension({
 		}
 		
 		
-		
-        
-        // ... (Include getPlainCursorPosition and setPlainCursorPosition here)
-        // Ensure you use the robust versions you have now, especially the latest 
-        // setPlainCursorPosition for end-of-content handling.
-        
-        // --- [Paste the helper functions here for a complete node file] ---
 
         const getPlainCursorPosition = (editor, selection) => {
             const range = selection.getRangeAt(0);

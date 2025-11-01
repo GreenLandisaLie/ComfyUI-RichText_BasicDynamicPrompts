@@ -193,6 +193,7 @@ app.registerExtension({
                 sel.addRange(range);
             }
         };
+		
 
         // --- [End of helper functions] ---
 
@@ -220,7 +221,7 @@ app.registerExtension({
                 white-space: pre-wrap;
                 overflow-y: auto;
                 font-family: monospace;
-                color: var(--fg-color);
+                color: #ffffff;
                 background: #222222;
                 outline: none;
             `;
@@ -250,12 +251,29 @@ app.registerExtension({
             // in w.value for a newly created node.
             updateEditorContent();
 			
-			
-            // --- Keep your existing event listeners (updated) ---
-			
             // Stop ComfyUI shortcuts
             editor.addEventListener("keydown", (e) => {
                 e.stopPropagation();
+				
+				if (e.key === 'Tab') { // add text editor behavior with the TAB key but use 4 spaces instead of '\t'
+					e.preventDefault(); // CRITICAL: Stop the browser from blurring the element/changing focus
+			
+					const sel = window.getSelection();
+					if (!sel || sel.rangeCount === 0) return;
+			
+					const plainOffset = getPlainCursorPosition(editor, sel);
+					let plainText = editor.innerText;
+					
+					const indentation = '    '; // Using 4 spaces
+					
+					plainText = plainText.substring(0, plainOffset) + indentation + plainText.substring(plainOffset);
+			
+					w.value = plainText; // Update ComfyUI widget
+					updateEditorContent(); // Re-highlight (this calls editor.innerHTML = highlight(text);)
+					
+					// Set cursor to the position after the inserted characters
+					setPlainCursorPosition(editor, plainOffset + indentation.length); 
+				}
             });
 			
             // Intercept 'Enter' to control newlines and cursor movement
@@ -300,6 +318,18 @@ app.registerExtension({
 				// Explicitly call blur
 				editor.blur();
 			});
+			
+			// --- Allow ComfyUI default zoom behavior with mouse wheel ---
+			editor.addEventListener("wheel", (e) => {
+				e.stopPropagation();
+				e.preventDefault();
+				// Re-dispatch to ComfyUI canvas manually
+				const canvas = document.querySelector("#graph-canvas");
+				if (canvas) {
+					const newEvent = new WheelEvent(e.type, e);
+					canvas.dispatchEvent(newEvent);
+				}
+			}, { passive: false });
 			
             
             // --- Use ComfyUI's DOM widget system ---

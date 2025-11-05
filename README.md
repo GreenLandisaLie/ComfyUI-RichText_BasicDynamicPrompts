@@ -5,8 +5,11 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v2.5.1
+  - [Lora Manager](https://github.com/willmiao/ComfyUI-Lora-Manager) preview tooltips now show up on Lora patterns even if they are within comments 
+
 - v2.5.0
-  - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
+  - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have [willmiao/ComfyUI-Lora-Manager](https://github.com/willmiao/ComfyUI-Lora-Manager) installed and its managing your loras.
 
 - v2.0.0
   - Adjust Font Size with CTRL + Mouse Wheel Up/Down 

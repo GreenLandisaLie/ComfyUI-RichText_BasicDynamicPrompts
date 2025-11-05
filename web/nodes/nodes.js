@@ -356,61 +356,171 @@ app.registerExtension({
 			// ----------------------------------------------------
             // 3. NEW: MOUSE/HOVER EVENT LISTENERS FOR LORA PREVIEW
             // ----------------------------------------------------
-
+			
             // 3a. Handle mouse movement/hover
-            editor.addEventListener("mousemove", (e) => {
+			editor.addEventListener("mousemove", (e) => {
 				if (!tooltip) return; // Exit if tooltip is not available (lora manager not installed)
 			
-				const target = e.target;
-				
-				// Check if the target is one of the highlighted LoRA spans
-				// This looks for a SPAN containing the text content matching the lora tag pattern
-				const isLoraSpan = target.tagName === 'SPAN' && target.textContent.startsWith('<lora');
+				// Clear early if no mouse coords
+				const x = e.clientX;
+				const y = e.clientY;
+				if (typeof x !== 'number' || typeof y !== 'number') return;
 			
-				if (isLoraSpan) {
-					// Extract the raw LoRA tag text
-					const tagText = target.textContent; // e.g., <lora:name:1.0>
-					
-					// Use the same regex from your highlight function to get the clean name
-					const match = tagText.match(/<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/i);
-					const loraName = match ? match[2].trim() : null;
-			
-					if (loraName) {
-						// Check if we just started hovering over a new element or if the timer is inactive
-						if (hoverTimeout === null) {
-							
-							// Clear any existing timeout just in case
-							if (hoverTimeout) clearTimeout(hoverTimeout);
-							
-							// Set the delay before showing the preview
-							hoverTimeout = setTimeout(async () => {
-								hoverTimeout = null; // Clear the timer ID once triggered
-								// e.clientX/Y are screen coordinates, perfect for fixed positioning
-								// Show the tooltip using the mouse position
-								await tooltip.show(loraName, e.clientX, e.clientY); 
-							}, HOVER_DELAY);
-						}
-						
-						// If the tooltip is already visible (meaning the timer has elapsed), keep updating its position
-						if (tooltip.element.style.display === 'block') {
-							tooltip.position(e.clientX, e.clientY);
-						}
-			
-					} else {
-						// The span looked like a LoRA but the name extraction failed, hide everything.
-						if (hoverTimeout) clearTimeout(hoverTimeout);
-						hoverTimeout = null;
-						tooltip.hide();
+				// Helper: get caret range from point (cross-browser)
+				const getRangeFromPoint = (x, y) => {
+					if (document.caretRangeFromPoint) {
+						return document.caretRangeFromPoint(x, y);
 					}
-				} else {
-					// Not hovering over a highlighted LoRA span.
-					// Clear the timer and hide the tooltip.
+					// Firefox
+					if (document.caretPositionFromPoint) {
+						const pos = document.caretPositionFromPoint(x, y);
+						if (!pos) return null;
+						const r = document.createRange();
+						r.setStart(pos.offsetNode, pos.offset);
+						r.setEnd(pos.offsetNode, pos.offset);
+						return r;
+					}
+					return null;
+				};
+			
+				// Helper: gather all text nodes under an element in document order
+				const collectTextNodes = (root) => {
+					const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+					const nodes = [];
+					let n;
+					while ((n = walker.nextNode())) nodes.push(n);
+					return nodes;
+				};
+			
+				// Helper: given a container element and a Range, compute the caret index within
+				// the container's concatenated text (or return null).
+				const caretIndexInElement = (elem, range) => {
+					if (!elem || !range) return null;
+					// get text nodes under elem
+					const textNodes = collectTextNodes(elem);
+					if (textNodes.length === 0) return null;
+			
+					// Determine which text node the range.startContainer is
+					let offsetNode = range.startContainer;
+					let offset = range.startOffset;
+			
+					// If the startContainer is an element, try to find nearest text child at offset
+					if (offsetNode.nodeType !== Node.TEXT_NODE) {
+						// If it's an element, try to get the text node at/after the child index
+						const child = offsetNode.childNodes[offset] || offsetNode.childNodes[Math.max(0, offset - 1)];
+						// find nearest text node descendant
+						offsetNode = (child && (child.nodeType === Node.TEXT_NODE)) ? child :
+									(child ? collectTextNodes(child)[0] : null) || null;
+						if (!offsetNode) {
+							// fallback: try the first text node of elem
+							offsetNode = textNodes[0];
+							offset = 0;
+						} else {
+							// if we found a text node inside the child, set offset to 0 (approx)
+							offset = 0;
+						}
+					}
+			
+					// find index of offsetNode in textNodes
+					let idx = -1;
+					for (let i = 0; i < textNodes.length; i++) {
+						if (textNodes[i] === offsetNode) {
+							idx = i;
+							break;
+						}
+					}
+					if (idx === -1) {
+						// The offsetNode might be outside elem; fallback to first text node
+						offsetNode = textNodes[0];
+						idx = 0;
+						offset = 0;
+					}
+			
+					// sum lengths of previous nodes
+					let caretIndex = offset;
+					for (let i = 0; i < idx; i++) caretIndex += textNodes[i].textContent.length;
+			
+					return { caretIndex, textNodes };
+				};
+			
+				// Get the range under the mouse pointer
+				const range = getRangeFromPoint(x, y);
+				if (!range) {
+					// couldn't determine caret: hide tooltip (same behavior)
 					if (hoverTimeout) clearTimeout(hoverTimeout);
 					hoverTimeout = null;
 					tooltip.hide();
+					return;
 				}
-			});
 			
+				// We will try to find the smallest relevant element to compute the local text.
+				// Prefer the nearest ancestor element of the range.startContainer that is inside editor.
+				let startNode = range.startContainer;
+				let elementForSearch = (startNode.nodeType === Node.TEXT_NODE) ? startNode.parentElement : startNode;
+			
+				// Sanity: ensure elementForSearch is within the editor; otherwise fallback to the event target
+				if (!elementForSearch || !editor.contains(elementForSearch)) {
+					elementForSearch = e.target && editor.contains(e.target) ? e.target : editor;
+				}
+			
+				// Compute caret index and concatenated text for this element
+				const ci = caretIndexInElement(elementForSearch, range);
+				if (!ci) {
+					if (hoverTimeout) clearTimeout(hoverTimeout);
+					hoverTimeout = null;
+					tooltip.hide();
+					return;
+				}
+				const { caretIndex, textNodes } = ci;
+			
+				// Build the concatenated text for the element (only once)
+				let fullText = "";
+				for (const tn of textNodes) fullText += tn.textContent;
+			
+				// LoRA regex (same as highlight)
+				const loraRegex = /<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi;
+				let found = null;
+				let m;
+				while ((m = loraRegex.exec(fullText)) !== null) {
+					const start = m.index;
+					const end = start + m[0].length;
+					// If caret is inside this match (inclusive)
+					if (caretIndex >= start && caretIndex <= end) {
+						// Use the last captured match (case-insensitive)
+						found = { match: m[0], prefix: m[1], name: m[2], start, end };
+						break;
+					}
+				}
+			
+				if (found) {
+					const loraName = found.name ? found.name.trim() : null;
+					if (loraName) {
+						// Start hover delay timer if not already running
+						if (hoverTimeout === null) {
+							if (hoverTimeout) clearTimeout(hoverTimeout);
+			
+							hoverTimeout = setTimeout(async () => {
+								hoverTimeout = null;
+								await tooltip.show(loraName, x, y);
+							}, HOVER_DELAY);
+						}
+			
+						// Update tooltip position if already visible
+						if (tooltip.element && tooltip.element.style.display === 'block') {
+							tooltip.position(x, y);
+						}
+						return;
+					}
+				}
+			
+				// Not inside a LoRA match -> hide
+				if (hoverTimeout) clearTimeout(hoverTimeout);
+				hoverTimeout = null;
+				tooltip.hide();
+			});
+            
+			
+			// 3b. Handle mouse leave
 			editor.addEventListener("mouseleave", () => {
 				if (!tooltip) return;
 				if (hoverTimeout) clearTimeout(hoverTimeout);

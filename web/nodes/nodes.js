@@ -1,5 +1,5 @@
 import { app } from "../../../scripts/app.js";
-
+import { PreviewTooltip } from "../widgets/loras_widget_components.js";
 
 app.registerExtension({
     name: "Comfy.SILVER_BasicDynamicPrompts",
@@ -184,6 +184,20 @@ app.registerExtension({
             origOnNodeCreated?.apply(this, arguments);
             console.log("[SILVER_BasicDynamicPrompts] JS initialized for:", this.title);
 			
+			// --- NEW: TOOLTIP SETUP ---
+            // Instantiate the tooltip once, if the class is available
+            let tooltip = null;
+            if (PreviewTooltip) {
+                tooltip = new PreviewTooltip();
+            } else {
+                console.warn("[SILVER_BasicDynamicPrompts] PreviewTooltip not found. Is ComfyUI-Lora-Manager or the component file loaded?");
+            }
+
+            let hoverTimeout = null;
+            const HOVER_DELAY = 1000; // 1 second delay before showing tooltip
+            let currentHoverElement = null;
+            // ---------------------------
+			
 			// --- 1. GET AVAILABLE LORAS ---
             const available_loras_stem_widget = this.widgets?.find(w => w.name === "available_loras_stem");
 			available_loras_stem_widget.computeSize = () => [0, 0];
@@ -337,6 +351,74 @@ app.registerExtension({
 				}
 			}, { passive: false });
 			
+			
+			
+			// ----------------------------------------------------
+            // 3. NEW: MOUSE/HOVER EVENT LISTENERS FOR LORA PREVIEW
+            // ----------------------------------------------------
+
+            // 3a. Handle mouse movement/hover
+            editor.addEventListener("mousemove", (e) => {
+				if (!tooltip) return; // Exit if tooltip is not available (lora manager not installed)
+			
+				const target = e.target;
+				
+				// Check if the target is one of the highlighted LoRA spans
+				// This looks for a SPAN containing the text content matching the lora tag pattern
+				const isLoraSpan = target.tagName === 'SPAN' && target.textContent.startsWith('<lora');
+			
+				if (isLoraSpan) {
+					// Extract the raw LoRA tag text
+					const tagText = target.textContent; // e.g., <lora:name:1.0>
+					
+					// Use the same regex from your highlight function to get the clean name
+					const match = tagText.match(/<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/i);
+					const loraName = match ? match[2].trim() : null;
+			
+					if (loraName) {
+						// Check if we just started hovering over a new element or if the timer is inactive
+						if (hoverTimeout === null) {
+							
+							// Clear any existing timeout just in case
+							if (hoverTimeout) clearTimeout(hoverTimeout);
+							
+							// Set the delay before showing the preview
+							hoverTimeout = setTimeout(async () => {
+								hoverTimeout = null; // Clear the timer ID once triggered
+								// e.clientX/Y are screen coordinates, perfect for fixed positioning
+								// Show the tooltip using the mouse position
+								await tooltip.show(loraName, e.clientX, e.clientY); 
+							}, HOVER_DELAY);
+						}
+						
+						// If the tooltip is already visible (meaning the timer has elapsed), keep updating its position
+						if (tooltip.element.style.display === 'block') {
+							tooltip.position(e.clientX, e.clientY);
+						}
+			
+					} else {
+						// The span looked like a LoRA but the name extraction failed, hide everything.
+						if (hoverTimeout) clearTimeout(hoverTimeout);
+						hoverTimeout = null;
+						tooltip.hide();
+					}
+				} else {
+					// Not hovering over a highlighted LoRA span.
+					// Clear the timer and hide the tooltip.
+					if (hoverTimeout) clearTimeout(hoverTimeout);
+					hoverTimeout = null;
+					tooltip.hide();
+				}
+			});
+			
+			editor.addEventListener("mouseleave", () => {
+				if (!tooltip) return;
+				if (hoverTimeout) clearTimeout(hoverTimeout);
+				hoverTimeout = null;
+				tooltip.hide();
+			});
+			
+			
             
             // --- Use ComfyUI's DOM widget system ---
             const widget = this.addDOMWidget(`richprompt_widget_${this.id}`, "dom", editor, {
@@ -348,8 +430,13 @@ app.registerExtension({
             this.setDirtyCanvas(true, true);
             
             // cleanup
+			const origOnRemoved = this.onRemoved;
             this.onRemoved = function() {
+				origOnRemoved?.apply(this, arguments);
                 editor.remove();
+				if (tooltip) {
+                    tooltip.cleanup();
+                }
             };
         };
 		

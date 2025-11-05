@@ -12,7 +12,10 @@ from comfy.utils import load_torch_file
 
 WILDCARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wildcards')
 
-DEFAULT_PROMPT = r"""### Version 2.0.0:
+DEFAULT_PROMPT = r"""### Version 2.5.0
+### - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
+
+### Version 2.0.0:
 ### - Adjust Font Size with CTRL + Mouse Wheel Up/Down 
 ### - Wildcards now support sub-directories like so: '__Folder1\Folder2\filename__'
 ### - Added LORA loading from prompt support and it supports up to 2 model/clip  (READ THE INSTRUCTIONS BELOW)
@@ -52,7 +55,7 @@ DEFAULT_PROMPT = r"""### Version 2.0.0:
 # The basic pattern for this is:
     <lora:LoraFilenameWithoutExtension> # Its showing in red because I do not have a Lora with that filename. NOTE: red highlighting based on the existance of the file is exclusive for Loras (wildcards will always be yellow)
 # A few more examples:
-    <lora:testlora1> # Because I have a 'testlora1.safetensors' file somewhere within my LORA dir - it does not show as red
+    <lora:testlora1> # Because I have a 'testlora1.safetensors' file somewhere within my LORA dir - it does not show as red (for me)
 # When the strength is not specified it defaults to 1 for both MODEL and CLIP
     <lora:testlora1:0.5>     # When only 1 strength value is specified - its applied to MODEL (CLIP will default to 1)
     <lora:testlora1:0.8:0.6> # Model strength: 80% | Clip strength: 60%
@@ -73,7 +76,7 @@ DEFAULT_PROMPT = r"""### Version 2.0.0:
 
 ## Advanced example:
 {
-     0.1:: <lora:testlora1:0.5> __something__
+     0.1:: <lora:testlora1:0.{5|6|7|8|9}> __something__
     |0.9:: {0.7::(__somethingElse__:1.3)|<lora:testlora1>}
 }
 

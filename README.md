@@ -5,6 +5,9 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v2.5.2
+  - Bug fix: Lora Preview Tooltips are no longer case sensitive
+
 - v2.5.1
   - [Lora Manager](https://github.com/willmiao/ComfyUI-Lora-Manager) preview tooltips now show up on Lora patterns even if they are within comments 
 

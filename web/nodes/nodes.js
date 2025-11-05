@@ -265,7 +265,7 @@ app.registerExtension({
 					
 					plainText = plainText.substring(0, plainOffset) + indentation + plainText.substring(plainOffset);
 			
-					w.value = plainText; // Update ComfyUI widget
+					prompt_widget.value = plainText; // Update ComfyUI widget
 					updateEditorContent(); // Re-highlight (this calls editor.innerHTML = highlight(text);)
 					
 					// Set cursor to the position after the inserted characters

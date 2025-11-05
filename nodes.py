@@ -482,7 +482,7 @@ class Lora:
 
 def get_available_loras_stem() -> str:
     loras = folder_paths.get_filename_list("loras")
-    return ",".join([Path(f).stem.lower() for f in loras])
+    return ",".join([Path(f).stem for f in loras])
 
 def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], List[str], List[str]]:
     """
@@ -699,4 +699,5 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "SILVER_BasicDynamicPrompts": "[Silver] Rich Text Basic Dynamic Prompts",
 }
+
 

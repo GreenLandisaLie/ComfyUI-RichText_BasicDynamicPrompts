@@ -1,10 +1,14 @@
 import { app } from "../../../scripts/app.js";
 
+
 app.registerExtension({
     name: "Comfy.SILVER_BasicDynamicPrompts",
-    beforeRegisterNodeDef(nodeType, nodeData, app) {
+	
+    async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "SILVER_BasicDynamicPrompts") return;
-
+		
+		let availableLoras = [];
+		
         // Advanced syntax highlighting with fixed comment typing behavior
 		const highlight = (text) => {
 			let work = text;
@@ -56,15 +60,34 @@ app.registerExtension({
 				const safe = escapeHTML(match);
 				return protect(`<span style="color:#FFD700; font-weight:bold;">${safe}</span>`);
 			});
-		
-			// LoRA / Embedding tags
-			const tagStyle = "color:#F4A460; font-weight:bold;";
-			work = work.replace(/<[^<>]*>/g, (match) => {
-				const innerRaw = match.slice(1, -1);
+			
+			// LoRA
+			work = work.replace(/<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi, (match, prefix, name) => {
+				const safeName = name.trim().toLowerCase();
+				const exists = availableLoras.includes(safeName);
+				
+				let baseColor;
+				// Determine base color based on the prefix used
+				if (prefix.toLowerCase() === 'lora_a') {
+					baseColor = "#ADFF2F"; // Example: GreenYellow for lora_a
+				} else if (prefix.toLowerCase() === 'lora_b') {
+					baseColor = "#7FFFD4"; // Example: Aquamarine for lora_B
+				} else {
+					baseColor = "#F4A460"; // Original: SandyBrown for lora
+				}
+			
+				// Set the final tag color: baseColor if exists, or bright red if not
+				const tagColor = exists ? baseColor : "#FF4444"; // baseColor or bright red
+				const tagStyle = `color:${tagColor}; font-weight:bold;`;
+				
+				let innerRaw = match.slice(1, -1);
 				let innerEsc = escapeHTML(innerRaw);
+				
+				// colorize weights
 				innerEsc = innerEsc.replace(/:([0-9]+(?:\.[0-9]+)?)/g, (m, n) =>
 					`<span style="color:#4aa3ff; font-weight:bold;">:${n}</span>`
 				);
+				
 				const frag = `<span style="${tagStyle}">&lt;${innerEsc}&gt;</span>`;
 				return protect(frag);
 			});
@@ -109,39 +132,6 @@ app.registerExtension({
 
 		
 		// --- Helper: find matching bracket pair indices ---
-		// TODO: implement this for custom highlight of valid, closed () and {} pairs when the cursor is next to their limiters
-		function findMatchingPair(text, cursorPos) {
-			const pairs = { '(': ')', ')': '(', '{': '}', '}': '{' };
-			const char = text[cursorPos] || text[cursorPos - 1];
-			if (!pairs[char]) return null;
-		
-			let open = ['(', '{'].includes(char) ? char : pairs[char];
-			let close = pairs[open];
-			let dir = ['(', '{'].includes(char) ? 1 : -1;
-			let stack = 0;
-		
-			if (dir === 1) {
-				for (let i = cursorPos; i < text.length; i++) {
-					if (text[i] === open) stack++;
-					else if (text[i] === close) {
-						stack--;
-						if (stack === 0) return [cursorPos, i];
-					}
-				}
-			} else {
-				for (let i = cursorPos - 1; i >= 0; i--) {
-					if (text[i] === close) stack++;
-					else if (text[i] === open) {
-						stack--;
-						if (stack === 0) return [i, cursorPos - 1];
-					}
-				}
-			}
-			return null;
-		}
-		
-		
-
         const getPlainCursorPosition = (editor, selection) => {
             const range = selection.getRangeAt(0);
             const preRange = range.cloneRange();
@@ -186,8 +176,6 @@ app.registerExtension({
                 sel.addRange(range);
             }
         };
-		
-
         // --- [End of helper functions] ---
 
 
@@ -195,11 +183,21 @@ app.registerExtension({
         nodeType.prototype.onNodeCreated = function() {
             origOnNodeCreated?.apply(this, arguments);
             console.log("[SILVER_BasicDynamicPrompts] JS initialized for:", this.title);
-
-            const w = this.widgets?.find(w => w.name === "prompt");
-			w.computeSize = () => [0, 0]; // Force the widget to take 0 height and 0 width
-			w.y = -600; // Keep this just in case, to push it off-screen visually
-            w.hidden = true; 
+			
+			// --- 1. GET AVAILABLE LORAS ---
+            const available_loras_stem_widget = this.widgets?.find(w => w.name === "available_loras_stem");
+			available_loras_stem_widget.computeSize = () => [0, 0];
+			available_loras_stem_widget.y = -1000;
+			available_loras_stem_widget.hidden = true;
+			
+			availableLoras = available_loras_stem_widget.value.split(',')
+			
+			
+			// --- 2. SETUP PROMPT WIDGET AND CUSTOM EDITOR ---
+            const prompt_widget = this.widgets?.find(w => w.name === "prompt");
+			prompt_widget.computeSize = () => [0, 0]; // Force the widget to take 0 height and 0 width
+			prompt_widget.y = -600; // Keep this just in case, to push it off-screen visually
+            prompt_widget.hidden = true; 
 
             const editor = document.createElement("div");
             editor.contentEditable = "true";
@@ -219,9 +217,15 @@ app.registerExtension({
                 outline: none;
             `;
 			
+			let editorFontSize = 14;          // default font size in px
+			const minFontSize = 4;            // minimum safe font size
+			const maxFontSize = 256;           // maximum safe font size
+			editor.style.fontSize = `${editorFontSize}px`;
+			
+			
             // Function to synchronize the custom editor from the ComfyUI widget value
             const updateEditorContent = () => {
-                const text = w.value || "";
+                const text = prompt_widget.value || "";
                 editor.innerHTML = highlight(text);
                 // Ensure the canvas updates its size if content changes on load
                 this.setDirtyCanvas(true, true); 
@@ -229,7 +233,7 @@ app.registerExtension({
             
             // --- FIX FOR REFRESH: INITIAL VALUE LOADING ---
             // 1. Redefine onCreated to use the actual loaded value
-            w.onCreated = () => {
+            prompt_widget.onCreated = () => {
                 // This ensures the custom editor is populated with the saved value
                 // AFTER ComfyUI has loaded it from the backend.
                 updateEditorContent(); 
@@ -237,11 +241,11 @@ app.registerExtension({
 			
             // 2. Add an event listener to the ComfyUI widget to force a visual update
             // if the value is ever changed externally (e.g., via a Load function)
-            w.callback = updateEditorContent;
+            prompt_widget.callback = updateEditorContent;
 			
 			// Explicitly call the update function at the end of onNodeCreated.
             // This forces the initial visual update using the value already confirmed to be
-            // in w.value for a newly created node.
+            // in prompt_widget.value for a newly created node.
             updateEditorContent();
 			
             // Stop ComfyUI shortcuts
@@ -280,7 +284,7 @@ app.registerExtension({
                     let plainText = editor.innerText;
                     plainText = plainText.substring(0, plainOffset) + "\n" + plainText.substring(plainOffset);
 
-                    w.value = plainText; // Update ComfyUI widget
+                    prompt_widget.value = plainText; // Update ComfyUI widget
                     updateEditorContent(); // Re-highlight
                     
                     setPlainCursorPosition(editor, plainOffset + 1);
@@ -294,7 +298,7 @@ app.registerExtension({
                 
                 const plainOffset = getPlainCursorPosition(editor, sel);
                 const plainText = editor.innerText;
-                w.value = plainText; // Update ComfyUI widget
+                prompt_widget.value = plainText; // Update ComfyUI widget
                 
                 updateEditorContent(); // Re-highlight
 			
@@ -314,6 +318,15 @@ app.registerExtension({
 			
 			// --- Allow ComfyUI default zoom behavior with mouse wheel ---
 			editor.addEventListener("wheel", (e) => {
+				if (e.ctrlKey) {
+					e.preventDefault(); // prevent zooming the whole page
+					const delta = Math.sign(e.deltaY);
+					editorFontSize -= delta; // scroll up => smaller deltaY => zoom in
+					editorFontSize = Math.max(minFontSize, Math.min(maxFontSize, editorFontSize));
+					editor.style.fontSize = `${editorFontSize}px`;
+					return; // do not forward this event to ComfyUI canvas
+				}
+				
 				e.stopPropagation();
 				e.preventDefault();
 				// Re-dispatch to ComfyUI canvas manually
@@ -339,5 +352,9 @@ app.registerExtension({
                 editor.remove();
             };
         };
-    },
+		
+	
+	},
 });
+
+

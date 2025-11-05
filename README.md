@@ -7,7 +7,7 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 - v2.0.0
   - Adjust Font Size with CTRL + Mouse Wheel Up/Down 
   - Wildcards now support sub-directories like so: '__Folder1\Folder2\filename__'
-  - Added LORA loading from prompt support and it supports up to 2 model/clip  (READ THE INSTRUCTIONS BELOW)
+  - Added LORA loading from prompt support and it supports up to 2 model/clip
 
 - v1.1.0
   - hardcoded font case to white instead of foreground var to prevent possible conflicts whith custom ComfyUI Themes

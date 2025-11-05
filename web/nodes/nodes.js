@@ -8,6 +8,7 @@ app.registerExtension({
         if (nodeData.name !== "SILVER_BasicDynamicPrompts") return;
 		
 		let availableLoras = [];
+		let availableLorasLowercase = [];
 		
         // Advanced syntax highlighting with fixed comment typing behavior
 		const highlight = (text) => {
@@ -64,7 +65,7 @@ app.registerExtension({
 			// LoRA
 			work = work.replace(/<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi, (match, prefix, name) => {
 				const safeName = name.trim().toLowerCase();
-				const exists = availableLoras.includes(safeName);
+				const exists = availableLorasLowercase.includes(safeName);
 				
 				let baseColor;
 				// Determine base color based on the prefix used
@@ -204,7 +205,8 @@ app.registerExtension({
 			available_loras_stem_widget.y = -1000;
 			available_loras_stem_widget.hidden = true;
 			
-			availableLoras = available_loras_stem_widget.value.split(',')
+			availableLoras = available_loras_stem_widget.value.split(',');
+			availableLorasLowercase = available_loras_stem_widget.value.split(',').map(stem => stem.toLowerCase());
 			
 			
 			// --- 2. SETUP PROMPT WIDGET AND CUSTOM EDITOR ---
@@ -495,13 +497,22 @@ app.registerExtension({
 				if (found) {
 					const loraName = found.name ? found.name.trim() : null;
 					if (loraName) {
+						
+						const originalCasedMatch = availableLoras.find(availableName =>
+							availableName.toLowerCase() === loraName.toLowerCase()
+						);
+						let finalLoraName = loraName; // Use loraName as default
+						if (originalCasedMatch) {
+							finalLoraName = originalCasedMatch;
+						}
+						
 						// Start hover delay timer if not already running
 						if (hoverTimeout === null) {
 							if (hoverTimeout) clearTimeout(hoverTimeout);
 			
 							hoverTimeout = setTimeout(async () => {
 								hoverTimeout = null;
-								await tooltip.show(loraName, x, y);
+								await tooltip.show(finalLoraName, x, y);
 							}, HOVER_DELAY);
 						}
 			

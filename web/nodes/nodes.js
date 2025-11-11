@@ -10,8 +10,12 @@ app.registerExtension({
 		let availableLoras = [];
 		let availableLorasLowercase = [];
 		
+		let current_wildcard_directory = "";
+		let stored_wildcard_directory = "";
+		let wildcard_files = [];
+		
         // Advanced syntax highlighting with fixed comment typing behavior
-		const highlight = (text) => {
+		const highlight = (text) => {			
 			let work = text;
 		
 			const tokens = [];
@@ -55,11 +59,13 @@ app.registerExtension({
 					`<span style="color:#6A9955; font-style:italic;">#${safe}</span>`
 				);
 			});
-		
+			
 			// Wildcards
 			work = work.replace(/__.*?__/g, (match) => {
+				const content = match.slice(2, -2);
+				const color = wildcard_files.includes(content.replace(/[\\/]+/g, "\\").toLowerCase()) ? "#FFD700" : "#FF4444";
 				const safe = escapeHTML(match);
-				return protect(`<span style="color:#FFD700; font-weight:bold;">${safe}</span>`);
+				return protect(`<span style="color:${color}; font-weight:bold;">${safe}</span>`);
 			});
 			
 			// LoRA
@@ -177,7 +183,17 @@ app.registerExtension({
                 sel.addRange(range);
             }
         };
-        // --- [End of helper functions] ---
+        
+		async function get_wildcard_files() {
+			const resp = await fetch("/silver_basicdynamicprompts/get_wildcard_files", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({current_wildcard_dir: current_wildcard_directory})
+			});
+			const data = await resp.json();
+			wildcard_files = data.wildcard_files || [];
+		};
+		// --- [End of helper functions] ---
 
 
         const origOnNodeCreated = nodeType.prototype.onNodeCreated;
@@ -540,6 +556,35 @@ app.registerExtension({
 			});
 			
 			
+			
+			// Support for wildcard pattern re-color based on file existance
+            const wildcard_directory_widget = this.widgets?.find(w => w.name === "wildcard_directory");
+            if (wildcard_directory_widget) {
+                // update immediately if value exists
+                current_wildcard_directory = wildcard_directory_widget.value || "";
+
+                // --- 1️⃣ Watch for user changes in UI ---
+                const original_callback = wildcard_directory_widget.callback;
+                wildcard_directory_widget.callback = async function(value) {
+                    current_wildcard_directory = value;
+					if (current_wildcard_directory !== stored_wildcard_directory) {
+						stored_wildcard_directory = current_wildcard_directory;
+						await get_wildcard_files();
+						updateEditorContent();
+					}
+                    if (original_callback) original_callback(value);
+                };
+
+                // --- 2️⃣ Catch async load after workflow restore ---
+                setTimeout(async () => {
+                    current_wildcard_directory = wildcard_directory_widget.value || "";
+					stored_wildcard_directory = current_wildcard_directory;
+					await get_wildcard_files();
+					updateEditorContent();
+                }, 2000);
+            }
+			
+			
             
             // --- Use ComfyUI's DOM widget system ---
             const widget = this.addDOMWidget(`richprompt_widget_${this.id}`, "dom", editor, {
@@ -564,5 +609,4 @@ app.registerExtension({
 	
 	},
 });
-
 

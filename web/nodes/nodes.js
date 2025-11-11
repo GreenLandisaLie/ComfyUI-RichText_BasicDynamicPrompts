@@ -12,6 +12,7 @@ app.registerExtension({
 		
 		let current_wildcard_directory = "";
 		let stored_wildcard_directory = "";
+		let hovered_wildcard_content = "";
 		let wildcard_files = [];
 		
         // Advanced syntax highlighting with fixed comment typing behavior
@@ -369,10 +370,30 @@ app.registerExtension({
 				}
 			}, { passive: false });
 			
+			// --- Quick Wildcard Edit ---
+			editor.addEventListener("mousedown", (e) => {
+				if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
+					if (hovered_wildcard_content !== "") {
+						e.preventDefault();
+						e.stopPropagation();
+						
+						const wildcard_file_path = current_wildcard_directory + "\\" + (hovered_wildcard_content.toLowerCase().endsWith(".txt") ? hovered_wildcard_content : hovered_wildcard_content + ".txt");
+						fetch("/silver_basicdynamicprompts/quick_open_wildcard", {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify({ file_path: wildcard_file_path })
+						});
+
+					}
+				}
+			});
+			
 			
 			
 			// ----------------------------------------------------
-            // 3. NEW: MOUSE/HOVER EVENT LISTENERS FOR LORA PREVIEW
+            // 3. NEW: MOUSE/HOVER EVENT LISTENERS FOR LORA PREVIEW + WILDCARD QUICK EDIT
             // ----------------------------------------------------
 			
             // 3a. Handle mouse movement/hover
@@ -494,24 +515,43 @@ app.registerExtension({
 				// Build the concatenated text for the element (only once)
 				let fullText = "";
 				for (const tn of textNodes) fullText += tn.textContent;
+				
+				
+				// Wildcard Quick Edit with CTRL + Left Click
+				const wildcardRegex = /__.*?__/g;
+				let wm;
+				while ((wm = wildcardRegex.exec(fullText)) !== null) {
+					const start = wm.index;
+					const end = start + wm[0].length;
+					if (caretIndex >= start && caretIndex <= end) {
+						const content = wm[0].slice(2, -2).replace(/[\\/]+/g, "\\");
+						if (content && wildcard_files.includes(content.toLowerCase())) {
+							hovered_wildcard_content = content;
+							return;
+						}
+						break;
+					}
+				}
+				hovered_wildcard_content = "";
+				
 			
 				// LoRA regex (same as highlight)
 				const loraRegex = /<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi;
-				let found = null;
-				let m;
-				while ((m = loraRegex.exec(fullText)) !== null) {
-					const start = m.index;
-					const end = start + m[0].length;
+				let foundLora = null;
+				let lm;
+				while ((lm = loraRegex.exec(fullText)) !== null) {
+					const start = lm.index;
+					const end = start + lm[0].length;
 					// If caret is inside this match (inclusive)
 					if (caretIndex >= start && caretIndex <= end) {
 						// Use the last captured match (case-insensitive)
-						found = { match: m[0], prefix: m[1], name: m[2], start, end };
+						foundLora = { match: lm[0], prefix: lm[1], name: lm[2], start, end };
 						break;
 					}
 				}
 			
-				if (found) {
-					const loraName = found.name ? found.name.trim() : null;
+				if (foundLora) {
+					const loraName = foundLora.name ? foundLora.name.trim() : null;
 					if (loraName) {
 						
 						const originalCasedMatch = availableLoras.find(availableName =>
@@ -539,7 +579,8 @@ app.registerExtension({
 						return;
 					}
 				}
-			
+				
+				
 				// Not inside a LoRA match -> hide
 				if (hoverTimeout) clearTimeout(hoverTimeout);
 				hoverTimeout = null;
@@ -549,6 +590,7 @@ app.registerExtension({
 			
 			// 3b. Handle mouse leave
 			editor.addEventListener("mouseleave", () => {
+				hovered_wildcard_content = "";
 				if (!tooltip) return;
 				if (hoverTimeout) clearTimeout(hoverTimeout);
 				hoverTimeout = null;

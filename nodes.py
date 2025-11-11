@@ -9,10 +9,23 @@ import folder_paths
 from comfy.sd import load_lora_for_models
 from comfy.utils import load_torch_file
 
+import json
+import requests
+from aiohttp import web
+from server import PromptServer
+
 
 WILDCARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wildcards')
 
-DEFAULT_PROMPT = r"""### Version 2.5.0
+DEFAULT_PROMPT = r"""### Version 2.6.0
+### - Wildcard patterns now become red when pointing to a .txt file that does not exist
+###   ATTENTION: 
+###      This highlight only supports up to 4 nested folders inside 'wildcard_directory'. 
+###      This means that the following example would be RED even if the file exists: 
+###           __Folder1\Folder2\Folder3\Folder4\Folder5\filename__
+
+
+### Version 2.5.0
 ### - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
 
 ### Version 2.0.0:
@@ -37,6 +50,8 @@ DEFAULT_PROMPT = r"""### Version 2.5.0
 # These pull a random non-empty line from a TXT file directly stored in 'wildcard_directory'.
 # They use double underscore delimiters and its content should be the filename without extension.
 # When 'wildcard_directory\filename.txt' does not exist -> the __filename__ string will remain in the prompt.
+# Wildcards are highlighted as YELLOW when they point to a .txt file that exists - otherwise, RED. 
+# This highlight feature only supports up to 4 nested subfolders - wildcards pointing to deeper files will still work but show up as red.
 # You can add comments and combinations within wildcards but try to not create infinite loops when doing so - the node has safety against that though.
 
     __ThisIsAWildCard__ # pulls from 'wildcard_directory\ThisIsAWildCard.txt' but I don't have that file so this string will appear in the final prompt
@@ -53,7 +68,7 @@ DEFAULT_PROMPT = r"""### Version 2.5.0
 ## ALL INPUTS ARE OPTIONAL (you can - for instance - just load on 'model_B' and ignore 'model_A' and clips)
 # Loras will only be loaded when at least 1 of the model/clip inputs is given plus you have at least 1 valid Lora pattern and 'load_loras_from_prompt' is 'true'.
 # The basic pattern for this is:
-    <lora:LoraFilenameWithoutExtension> # Its showing in red because I do not have a Lora with that filename. NOTE: red highlighting based on the existance of the file is exclusive for Loras (wildcards will always be yellow)
+    <lora:LoraFilenameWithoutExtension> # Its showing in red because I do not have a Lora with that filename.
 # A few more examples:
     <lora:testlora1> # Because I have a 'testlora1.safetensors' file somewhere within my LORA dir - it does not show as red (for me)
 # When the strength is not specified it defaults to 1 for both MODEL and CLIP
@@ -263,12 +278,18 @@ def dynamic_prompts(
         Returns:
             str: The prompt string with wildcards replaced by a single selected line.
         """
-        if wildcard_dir is None or not os.path.isdir(wildcard_dir):
+        if wildcard_dir is None or not wildcard_dir:
+            return prompt
+        
+        wildcard_path = Path(wildcard_dir)
+        valid_wildcard_path = wildcard_path.exists() and wildcard_path.is_dir() and (str(wildcard_path.resolve()) != str(wildcard_path.anchor))
+        if not valid_wildcard_path:
+            print(f"[SILVER_BasicDynamicPrompts] Invalid wildcard_directory: {wildcard_dir}")
             return prompt
         
         # Seed the random number generator for wildcard selection
         random.seed(seed)
-    
+        
         # Regex to find '__something__' or '__something.txt__'
         pattern = re.compile(r'__(.+?)__')
         
@@ -691,6 +712,36 @@ wildcard_directory: The directory where TXT wildcard files are stored.
 
 
 
+@PromptServer.instance.routes.post("/silver_basicdynamicprompts/get_wildcard_files")
+async def get_wildcard_files(request):
+    data = await request.json()
+    current_wildcard_dir = data.get("current_wildcard_dir", "")
+    if not current_wildcard_dir:
+        return web.json_response({"wildcard_files": []})
+    
+    wildcard_files = []
+    wildcard_path = Path(current_wildcard_dir)
+    if current_wildcard_dir and wildcard_path.exists() and wildcard_path.is_dir() and (str(wildcard_path.resolve()) != str(wildcard_path.anchor)): # ignore cases like 'C:\'
+        for root, dirs, files in os.walk(current_wildcard_dir):
+            
+            relative_path = Path(root).relative_to(wildcard_path)
+            
+            depth = len(relative_path.parts)
+            if depth > 4:
+                dirs.clear() # Clear the 'dirs' list to prevent os.walk from descending into subdirectories of the current 'root' folder.
+                continue # Skip processing files in this folder
+            
+            for file in files:
+                if file.endswith(".txt"):
+                    full_file_path = Path(root) / file
+                    relative_file_path = full_file_path.relative_to(wildcard_path) # Determine the relative path of the file inside current_wildcard_dir. The Path.relative_to() method is perfect for this.
+                    relative_path_no_ext = relative_file_path.parent / relative_file_path.stem
+                    wildcard_files.append(str(relative_path_no_ext).lower())
+                    wildcard_files.append(str(relative_path_no_ext).lower() + ".txt") # fast way to add support for: __filename.txt__
+    
+    return web.json_response({"wildcard_files": wildcard_files})
+
+
 
 NODE_CLASS_MAPPINGS = {
     "SILVER_BasicDynamicPrompts": SILVER_BasicDynamicPrompts,
@@ -699,5 +750,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "SILVER_BasicDynamicPrompts": "[Silver] Rich Text Basic Dynamic Prompts",
 }
-
 

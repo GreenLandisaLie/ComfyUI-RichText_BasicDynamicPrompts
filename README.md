@@ -5,6 +5,9 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v2.7.0
+  - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)
+
 - v2.6.0
   - Wildcard patterns now become red when pointing to a .txt file that does not exist
 

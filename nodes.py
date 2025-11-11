@@ -14,10 +14,16 @@ import requests
 from aiohttp import web
 from server import PromptServer
 
+import subprocess
+
 
 WILDCARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wildcards')
 
-DEFAULT_PROMPT = r"""### Version 2.6.0
+DEFAULT_PROMPT = r"""### Version 2.7.0
+### - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)
+
+
+### Version 2.6.0
 ### - Wildcard patterns now become red when pointing to a .txt file that does not exist
 ###   ATTENTION: 
 ###      This highlight only supports up to 4 nested folders inside 'wildcard_directory'. 
@@ -740,6 +746,30 @@ async def get_wildcard_files(request):
                     wildcard_files.append(str(relative_path_no_ext).lower() + ".txt") # fast way to add support for: __filename.txt__
     
     return web.json_response({"wildcard_files": wildcard_files})
+
+
+@PromptServer.instance.routes.post("/silver_basicdynamicprompts/quick_open_wildcard")
+async def quick_open_wildcard(request):
+    try:
+        data = await request.json()
+        file_path = data.get("file_path")
+        
+        if not file_path or not os.path.exists(file_path):
+            return web.json_response({"success": False, "error": f"File not found: {file_path}"})
+        
+        if os.name == 'nt': # Windows
+            os.startfile(file_path)
+        elif os.uname().sysname == 'Darwin': # macOS
+            subprocess.call(('open', file_path))
+        else: # Linux and others
+            subprocess.call(('xdg-open', file_path))
+            
+        return web.json_response({"success": True})
+    
+    except Exception as e:
+        print(f"Error in quick_open_wildcard: {e}")
+        return web.json_response({"success": False, "error": str(e)}, status=500)
+
 
 
 

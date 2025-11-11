@@ -5,6 +5,9 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v2.6.0
+  - Wildcard patterns now become red when pointing to a .txt file that does not exist
+
 - v2.5.2
   - Bug fix: Lora Preview Tooltips are no longer case sensitive
 

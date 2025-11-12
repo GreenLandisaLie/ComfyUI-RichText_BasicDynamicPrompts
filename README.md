@@ -5,7 +5,7 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
-- v2.7.1
+- v2.7.2
   - Fixed a minor bug that was caused by having medium/large comments within normal comments and/or large comments within medium ones.
 
 - v2.7.1

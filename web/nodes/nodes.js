@@ -175,6 +175,50 @@ app.registerExtension({
             }
         };
         
+		// EX: 'aaa ### bbb ###### ccc' -> 'aaa ### bbb # ccc'
+		const fixCommentBody = (text) => {
+			// Split the input text into individual lines
+			const lines = text.split('\n');
+			const fixedLines = [];
+		
+			for (const line of lines) {
+				// 1. Find the index of the very first '#'
+				const firstHashIndex = line.indexOf('#');
+		
+				if (firstHashIndex === -1) {
+					// If no comment is found on this line, keep the line as is
+					fixedLines.push(line);
+					continue;
+				}
+		
+				// 2. Determine the end index of the initial consecutive '#' sequence (the comment marker).
+				// This ensures the full starting sequence (e.g., '#', '##', or '###') is preserved.
+				let initialMarkerEndIndex = firstHashIndex + 1;
+				while (initialMarkerEndIndex < line.length && line[initialMarkerEndIndex] === '#') {
+					initialMarkerEndIndex++;
+				}
+		
+				// 3. Separate the line into the preserved prefix (code + initial marker)
+				// and the mutable comment body.
+				const prefixPart = line.substring(0, initialMarkerEndIndex);
+		
+				// The body is the rest of the line, where the cleaning will occur.
+				const commentBodyPart = line.substring(initialMarkerEndIndex);
+		
+				// 4. Apply replacement to the comment body:
+				// The regex /##+/g matches two or more consecutive '#' characters and replaces
+				// the entire match with a single '#' character.
+				const fixedCommentBody = commentBodyPart.replace(/##+/g, '#');
+		
+				// 5. Reassemble the line and add it to the results
+				const fixedLine = prefixPart + fixedCommentBody;
+				fixedLines.push(fixedLine);
+			}
+		
+			// Join the lines back together with newline characters
+			return fixedLines.join('\n');
+		};
+		
 		async function get_wildcard_files() {
 			const resp = await fetch("/silver_basicdynamicprompts/get_wildcard_files", {
 				method: "POST",
@@ -250,8 +294,7 @@ app.registerExtension({
             const updateEditorContent = () => {
                 const text = prompt_widget.value || "";
                 editor.innerHTML = highlight(text);
-                // Ensure the canvas updates its size if content changes on load
-                this.setDirtyCanvas(true, true); 
+                this.setDirtyCanvas(true, true); // Ensure the canvas updates its size if content changes on load
             };
             
             // --- FIX FOR REFRESH: INITIAL VALUE LOADING ---
@@ -287,8 +330,10 @@ app.registerExtension({
 					const indentation = '    '; // Using 4 spaces
 					
 					plainText = plainText.substring(0, plainOffset) + indentation + plainText.substring(plainOffset);
-			
-					prompt_widget.value = plainText; // Update ComfyUI widget
+					
+					const fixed_text = fixCommentBody(plainText);
+					prompt_widget.value = fixed_text;  // Update ComfyUI widget
+					
 					updateEditorContent(); // Re-highlight (this calls editor.innerHTML = highlight(text);)
 					
 					// Set cursor to the position after the inserted characters
@@ -306,8 +351,10 @@ app.registerExtension({
                     const plainOffset = getPlainCursorPosition(editor, sel);
                     let plainText = editor.innerText;
                     plainText = plainText.substring(0, plainOffset) + "\n" + plainText.substring(plainOffset);
-
-                    prompt_widget.value = plainText; // Update ComfyUI widget
+					
+					const fixed_text = fixCommentBody(plainText);
+					prompt_widget.value = fixed_text;  // Update ComfyUI widget
+					
                     updateEditorContent(); // Re-highlight
                     
                     setPlainCursorPosition(editor, plainOffset + 1);
@@ -321,7 +368,9 @@ app.registerExtension({
                 
                 const plainOffset = getPlainCursorPosition(editor, sel);
                 const plainText = editor.innerText;
-                prompt_widget.value = plainText; // Update ComfyUI widget
+				
+				const fixed_text = fixCommentBody(plainText);
+				prompt_widget.value = fixed_text;  // Update ComfyUI widget
                 
                 updateEditorContent(); // Re-highlight
 			

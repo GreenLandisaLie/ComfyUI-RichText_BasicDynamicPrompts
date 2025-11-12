@@ -70,35 +70,25 @@ app.registerExtension({
 			});
 			
 			// LoRA
-			work = work.replace(/<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi, (match, prefix, name) => {
-				const safeName = name.trim().toLowerCase();
-				const exists = availableLorasLowercase.includes(safeName);
-				
+			work = work.replace(/<(lora|lora_a|lora_b):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi, (match, prefix, name) => {
 				let baseColor;
-				// Determine base color based on the prefix used
-				if (prefix.toLowerCase() === 'lora_a') {
-					baseColor = "#ADFF2F"; // Example: GreenYellow for lora_a
-				} else if (prefix.toLowerCase() === 'lora_b') {
-					baseColor = "#7FFFD4"; // Example: Aquamarine for lora_B
-				} else {
-					baseColor = "#F4A460"; // Original: SandyBrown for lora
-				}
-			
-				// Set the final tag color: baseColor if exists, or bright red if not
-				const tagColor = exists ? baseColor : "#FF4444"; // baseColor or bright red
+				if (prefix.toLowerCase() === "lora_a") baseColor = "#ADFF2F";
+				else if (prefix.toLowerCase() === "lora_b") baseColor = "#7FFFD4";
+				else baseColor = "#F4A460";
+		
+				const tagColor = availableLorasLowercase.includes(name.trim().toLowerCase()) ? baseColor : "#FF4444";
 				const tagStyle = `color:${tagColor}; font-weight:bold;`;
-				
+		
 				let innerRaw = match.slice(1, -1);
 				let innerEsc = escapeHTML(innerRaw);
-				
-				// colorize weights
+		
 				innerEsc = innerEsc.replace(/:([0-9]+(?:\.[0-9]+)?)/g, (m, n) =>
 					`<span style="color:#4aa3ff; font-weight:bold;">:${n}</span>`
 				);
-				
+		
 				const frag = `<span style="${tagStyle}">&lt;${innerEsc}&gt;</span>`;
 				return protect(frag);
-			});
+			});			
 		
 			// Escape remaining text
 			work = work.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -536,7 +526,7 @@ app.registerExtension({
 				
 			
 				// LoRA regex (same as highlight)
-				const loraRegex = /<(lora|lora_a|lora_b):([^:>]+)(?::[^>]*)?>/gi;
+				const loraRegex = /<(lora|lora_a|lora_b):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi;
 				let foundLora = null;
 				let lm;
 				while ((lm = loraRegex.exec(fullText)) !== null) {

@@ -6,7 +6,10 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 # Changelog
 - v2.7.1
-  - Fixed a bug in lora pattern regex that caused problems when user starts writting a lora pattern before already written lora patterns.
+  - Fixed a minor bug that was caused by having medium/large comments within normal comments and/or large comments within medium ones.
+
+- v2.7.1
+  - Fixed a bug in lora pattern regex that caused problems when user starts writing a lora pattern before already writen lora patterns.
 
 - v2.7.0
   - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)

@@ -5,6 +5,9 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v3.0.0
+  - Fixed major copy/paste bugs introduced in comfyui-frontend-package==1.30.2
+
 - v2.7.2
   - Fixed a minor bug that was caused by having medium/large comments within normal comments and/or large comments within medium ones.
 

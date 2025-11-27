@@ -671,8 +671,21 @@ app.registerExtension({
             const widget = this.addDOMWidget(`richprompt_widget_${this.id}`, "dom", editor, {
                 //computeSize: (w, h) => [w, Math.max(50, Math.max(50, editor.scrollHeight + 10))]
 				//computeSize: (w, h) => [w, h]
-            });			
+            });
 			
+			const stopPropagation = (e) => {
+				// Prevent the event from bubbling up to the ComfyUI canvas listeners
+				e.stopPropagation();
+				
+				// Optional: Stop the default action, though the browser should handle it
+				// for contentEditable elements correctly if propagation is stopped.
+				// e.preventDefault(); 
+			};
+			
+			// FIX issue caused by: https://github.com/Comfy-Org/ComfyUI_frontend/pull/6087/files
+			editor.addEventListener("copy", stopPropagation);
+			editor.addEventListener("paste", stopPropagation);
+			editor.addEventListener("cut", stopPropagation);
             
             this.setDirtyCanvas(true, true);
             
@@ -690,4 +703,3 @@ app.registerExtension({
 	
 	},
 });
-

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-richtext_basicdynamicprompts"
 description = "Basic Dynamic Prompts functionality with a Rich Text texbox for coloring."
-version = "2.7.2"
+version = "3.0.0"
 license = { file = "LICENSE.md" }
 
 [project.urls]

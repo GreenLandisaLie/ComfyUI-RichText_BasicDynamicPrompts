@@ -13,6 +13,7 @@ app.registerExtension({
 		let current_wildcard_directory = "";
 		let stored_wildcard_directory = "";
 		let hovered_wildcard_content = "";
+		let hovered_lora_content = "";
 		let wildcard_files = [];
 		
         // Advanced syntax highlighting with fixed comment typing behavior
@@ -236,6 +237,14 @@ app.registerExtension({
             origOnNodeCreated?.apply(this, arguments);
             console.log("[SILVER_BasicDynamicPrompts] JS initialized for:", this.title);
 			
+			const toggleSpellCheckButton = this.addWidget("button", "Toggle SpellCheck", null, () => {
+				if (editor) {
+					editor.spellcheck = !editor.spellcheck;
+					updateEditorContent();
+				}
+			});
+			
+			
 			// --- NEW: TOOLTIP SETUP ---
             // Instantiate the tooltip once, if the class is available
             let tooltip = null;
@@ -244,7 +253,7 @@ app.registerExtension({
             } else {
                 console.warn("[SILVER_BasicDynamicPrompts] PreviewTooltip not found. Is ComfyUI-Lora-Manager or the component file loaded?");
             }
-
+			
             let hoverTimeout = null;
             const HOVER_DELAY = 1000; // 1 second delay before showing tooltip
             let currentHoverElement = null;
@@ -426,6 +435,19 @@ app.registerExtension({
 						});
 
 					}
+					if (hovered_lora_content !== "") {
+						e.preventDefault();
+						e.stopPropagation();
+						
+						fetch("/silver_basicdynamicprompts/quick_open_lora_location", {
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify({ lora_name: hovered_lora_content })
+						});
+
+					}
 				}
 			});
 			
@@ -572,6 +594,7 @@ app.registerExtension({
 					}
 				}
 				hovered_wildcard_content = "";
+				hovered_lora_content = "";
 				
 			
 				// LoRA regex (same as highlight)
@@ -599,6 +622,7 @@ app.registerExtension({
 						let finalLoraName = loraName; // Use loraName as default
 						if (originalCasedMatch) {
 							finalLoraName = originalCasedMatch;
+							hovered_lora_content = loraName;
 						}
 						
 						// Start hover delay timer if not already running
@@ -630,6 +654,7 @@ app.registerExtension({
 			// 3b. Handle mouse leave
 			editor.addEventListener("mouseleave", () => {
 				hovered_wildcard_content = "";
+				hovered_lora_content = "";
 				if (!tooltip) return;
 				if (hoverTimeout) clearTimeout(hoverTimeout);
 				hoverTimeout = null;

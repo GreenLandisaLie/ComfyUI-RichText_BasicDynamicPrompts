@@ -770,6 +770,45 @@ async def quick_open_wildcard(request):
         print(f"Error in quick_open_wildcard: {e}")
         return web.json_response({"success": False, "error": str(e)}, status=500)
 
+@PromptServer.instance.routes.post("/silver_basicdynamicprompts/quick_open_lora_location")
+async def quick_open_lora_location(request):
+    try:
+        data = await request.json()
+        lora_name = data.get("lora_name")
+        
+        available_loras = folder_paths.get_filename_list("loras")
+        matched_filename = next((f for f in available_loras if Path(f).stem == lora_name), None)
+        
+        if matched_filename is None:
+            return web.json_response({"success": False, "error": f"LoRA not found: {lora_name}"}, status=500)
+        
+        lora_location = folder_paths.get_full_path("loras", matched_filename)
+        if not lora_location or not os.path.exists(lora_location):
+            return web.json_response({"success": False, "error": f"LoRA not found: {lora_location}"}, status=500)
+        
+        if os.name == 'nt': # Windows
+            # /select, allows highlighting the file in a new explorer window
+            subprocess.run(['explorer', '/select,', os.path.normpath(lora_location)])
+        elif os.uname().sysname == 'Darwin': # macOS
+            subprocess.run(['open', '-R', lora_location])
+        else: # Linux and others
+            try:
+                # This is the most standard way to "select" a file on modern Linux distros
+                subprocess.run([
+                    'dbus-send', '--session', '--dest=org.freedesktop.FileManager1', '--type=method_call',
+                    '/org/freedesktop/FileManager1', 'org.freedesktop.FileManager1.ShowItems',
+                    f'array:string:"file://{os.path.abspath(lora_location)}"', 'string:""'
+                ], check=True)
+            except Exception:
+                # Fallback to just opening the directory if dbus fails
+                subprocess.run(['xdg-open', os.path.dirname(lora_location)])
+            
+        return web.json_response({"success": True})
+    
+    except Exception as e:
+        print(f"Error in quick_open_lora_location: {e}")
+        return web.json_response({"success": False, "error": str(e)}, status=500)
+
 
 
 

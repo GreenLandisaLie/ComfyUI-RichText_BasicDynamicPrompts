@@ -5,6 +5,10 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v3.2.0
+  - Support for native Comfyui Ctrl+Enter command
+  - Fixed comments within multi-line combinations not being ignored
+
 - v3.1.0
   - Added a 'Toggle SpellCheck' button - very useful to spot typos
   - CTRL + Left Mouse Click on a non-red LoRA pattern -> opens Windows Explorer at that lora's location with it pre-selected. Does the equivalent of that for MacOS and Linux.

@@ -325,6 +325,9 @@ app.registerExtension({
 			
             // Stop ComfyUI shortcuts
             editor.addEventListener("keydown", (e) => {
+				
+				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) return; // Support for native Ctrl+Enter command
+				
                 e.stopPropagation();
 				
 				if (e.key === 'Tab') { // add text editor behavior with the TAB key but use 4 spaces instead of '\t'
@@ -353,6 +356,9 @@ app.registerExtension({
             // Intercept 'Enter' to control newlines and cursor movement
             editor.addEventListener("keypress", (e) => {
                 if (e.key === 'Enter') {
+					
+					if (e.ctrlKey || e.metaKey) return; // Support for native Ctrl+Enter command
+					
                     e.preventDefault(); 
                     const sel = window.getSelection();
                     if (!sel || sel.rangeCount === 0) return;
@@ -399,7 +405,7 @@ app.registerExtension({
 			
 			// --- Allow ComfyUI default zoom behavior with mouse wheel ---
 			editor.addEventListener("wheel", (e) => {
-				if (e.ctrlKey) {
+				if (e.ctrlKey || e.metaKey) {
 					e.preventDefault(); // prevent zooming the whole page
 					const delta = Math.sign(e.deltaY);
 					editorFontSize -= delta; // scroll up => smaller deltaY => zoom in
@@ -710,8 +716,9 @@ app.registerExtension({
 			// FIX issue caused by: https://github.com/Comfy-Org/ComfyUI_frontend/pull/6087/files
 			editor.addEventListener("copy", stopPropagation);
 			editor.addEventListener("paste", stopPropagation);
-			editor.addEventListener("cut", stopPropagation);
+			editor.addEventListener("cut", stopPropagation);			
             
+			
             this.setDirtyCanvas(true, true);
             
             // cleanup

@@ -465,6 +465,8 @@ app.registerExtension({
 			
             // 3a. Handle mouse movement/hover
 			editor.addEventListener("mousemove", (e) => {
+				if (editor.style.cursor !== "default") editor.style.cursor = "default"; // Fix cursor changing bug
+				
 				if (!tooltip) return; // Exit if tooltip is not available (lora manager not installed)
 			
 				// Clear early if no mouse coords

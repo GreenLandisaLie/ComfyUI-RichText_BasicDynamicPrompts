@@ -396,7 +396,7 @@ def dynamic_prompts(
     
             start, end = match.span()
             choices_str = match.group(1)
-    
+            
             # --- Parse choices and weights ---
             processed_lines = []
             for line in choices_str.splitlines(): # Remove comments and empty lines inside combinations ---
@@ -407,17 +407,17 @@ def dynamic_prompts(
                 comment_idx = stripped.find('#') # Remove inline comments
                 if comment_idx != -1:
                     stripped = stripped[:comment_idx]
-                   
+            
                 processed_lines.append(stripped)
             
             recombined = "\n".join(processed_lines)
             raw_choices_list = [c.strip() for c in recombined.split('|')]
-
-           
+            
+            
             weighted_choices = []
             unweighted_choices = []
             total_defined_weight = 0.0
-    
+            
             for item in raw_choices_list:
                 if '::' in item:
                     try:
@@ -561,6 +561,15 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
                 lora_found_name = stem
                 lora_path = folder_paths.get_full_path("loras", lora_file)
                 break
+        
+        # Fix for lora filenames with dots
+        if "." in name_in_prompt and not lora_path:
+            for lora_file in lora_files:
+                stem = Path(lora_file).stem
+                if stem.lower().strip() == name_in_prompt.strip().lower().replace(". ", "."):
+                    lora_found_name = stem
+                    lora_path = folder_paths.get_full_path("loras", lora_file)
+                    break
         
         # B. Parse Weights
         model_weight = float(model_w_str) if model_w_str else 1.0
@@ -725,6 +734,7 @@ wildcard_directory: The directory where TXT wildcard files are stored.
         if remove_loras_pattern and len(all_patterns) > 0:
             for pattern in all_patterns:
                 dp = dp.replace(pattern, "")
+                dp = dp.replace(pattern.replace(". ", "."), "") # Fix for lora filenames with dots
             if remove_whitespaces or remove_empty_tags:
                 dp = dynamic_prompts(prompt = dp, seed = seed, line_suffix = line_suffix, single_line_output = single_line_output, remove_whitespaces = remove_whitespaces, remove_empty_tags = remove_empty_tags, wildcard_dir = wildcard_directory)
         
@@ -833,5 +843,4 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "SILVER_BasicDynamicPrompts": "[Silver] Rich Text Basic Dynamic Prompts",
 }
-
 

@@ -5,6 +5,10 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v3.3.0
+  - Fixed loras not loading in some cases when their filenames contain dots '.'
+  - Fixed a bug that occasionally caused the cursor style to change when hovering over the node's prompt editor
+  
 - v3.2.0
   - Support for native Comfyui Ctrl+Enter command
   - Fixed comments within multi-line combinations not being ignored

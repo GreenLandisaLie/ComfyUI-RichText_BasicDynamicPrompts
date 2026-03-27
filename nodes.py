@@ -558,8 +558,8 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
     matches = re.findall(pattern, prompt, re.IGNORECASE)
     
     for prefix, name_in_prompt, model_w_str, clip_w_str in matches:
-        load_on_model_A = 'lora_b' not in prefix.lower()
-        load_on_model_B = 'lora_a' not in prefix.lower()
+        load_on_model_A = prefix.lower() in ["lora", "lora_visual", "lora_audio", "lora_a", "lora_a_visual", "lora_a_audio"]
+        load_on_model_B = prefix.lower() in ["lora", "lora_visual", "lora_audio", "lora_b", "lora_b_visual", "lora_b_audio"]
         
         loadMode = LoraLoadMode.Default if "visual" not in prefix.lower() and "audio" not in prefix.lower() else LoraLoadMode.VisualOnly if "visual" in prefix.lower() else LoraLoadMode.AudioOnly
         

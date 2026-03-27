@@ -4,6 +4,7 @@ import math
 import random
 from typing import List, Tuple, Dict
 from pathlib import Path
+from enum import Enum
 
 import folder_paths
 from comfy.sd import load_lora_for_models
@@ -19,26 +20,9 @@ import subprocess
 
 WILDCARD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wildcards')
 
-DEFAULT_PROMPT = r"""### Version 2.7.0
-### - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)
+DEFAULT_PROMPT = r"""### Instructions and Tips
 
-
-### Version 2.6.0
-### - Wildcard patterns now become red when pointing to a .txt file that does not exist
-###   ATTENTION: 
-###      This highlight only supports up to 4 nested folders inside 'wildcard_directory'. 
-###      This means that the following example would be RED even if the file exists: 
-###           __Folder1\Folder2\Folder3\Folder4\Folder5\filename__
-
-
-### Version 2.5.0
-### - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
-
-### Version 2.0.0:
-### - Adjust Font Size with CTRL + Mouse Wheel Up/Down 
-### - Wildcards now support sub-directories like so: '__Folder1\Folder2\filename__'
-### - Added LORA loading from prompt support and it supports up to 2 model/clip  (READ THE INSTRUCTIONS BELOW)
-
+## NEW in v3.4.0: ability to specify audio-only/visual-only weights when loading a lora from prompt (read more below)
 
 ## COMBINATIONS
 
@@ -63,14 +47,14 @@ DEFAULT_PROMPT = r"""### Version 2.7.0
     __ThisIsAWildCard__ # pulls from 'wildcard_directory\ThisIsAWildCard.txt' but I don't have that file so this string will appear in the final prompt
     __Folder1\Folder2\ThisIsAWildCard__ # sub-directory support - will pull from 'wildcard_directory\Folder1\Folder2\ThisIsAWildCard.txt'
 
+## You can nest combinations and wildcards at will (ex: combination within wildcard within combination ...)
+
 ## Word weightning
 # This is already natively supported by ComfyUI - in case you didn't know, it reinforces the importance of the encased words.
     (car or something:1.2) # Just showcasing that these are also highlighted
 
 
-## You can nest combinations and wildcards at will (ex: combination within wildcard within combination ...)
-
-### NEW (v2.0.0): Lora Loading from prompt
+### Lora Loading from prompt
 ## ALL INPUTS ARE OPTIONAL (you can - for instance - just load on 'model_B' and ignore 'model_A' and clips)
 # Loras will only be loaded when at least 1 of the model/clip inputs is given plus you have at least 1 valid Lora pattern and 'load_loras_from_prompt' is 'true'.
 # The basic pattern for this is:
@@ -87,12 +71,31 @@ DEFAULT_PROMPT = r"""### Version 2.7.0
     <lora_B:testlora1> # Will only load on model_B or clip_B if they were given as inputs
     <lora:testlora1>   # Loads on everything
 # With this its possible to specify which Loras to load on WAN 2.1 High/Low noise models.
+
+# You can also load only audio-related weights from a lora by using any of the following prefixes: 'lora_audio'/'lora_A_audio'/'lora_B_audio'
+# To load everything EXCEPT audio-related weights use any of these: 'lora_visual'/'lora_A_visual'/'lora_B_visual'
+# This feature was added because LTX-2 LoRAs sometimes include audio weights despite not being trained on audio and that messes up the audio.
+# Also sometimes you may want to only use the audio capabilities of a specific LoRA that was trained with audio.
+# Note: a weight is internally considered 'audio-related' when its name contains any of the following words: audio/vocoder/speech/sound/music
+#       that means this feature works for LTX-2 but may not work for other models if they use different names
+
 ## NOTES AND LIMITATIONS:
 #    - The same Lora will never be loaded twice. If the same Lora was used for multiple patterns then it will be loaded just once using the highest specified strengths.
 #        Ex:  '<lora:something> <lora:something:0.5:2> <lora:something:3:0>' --- This would load as if you had set this single pattern: '<lora:something:3:2>'
 #        Ex2: '<lora:something> <lora_A:something>' --- this will not cause the Lora to load twice on model/clip A - it will simply be loaded once on both A and B.
 #    - The script loads Loras by the first filename match found. This means if you have multiple loras with the exact same filename nested in your LORA dir - only 1 of them will be loaded and it might not be the one you wanted to load. Just be sure to not have multiple Loras with the same filename even if they are in different subfolders.
 #    -  The script loads the Loras using the default ComfyUI's code. This means its limited to native ComfyUI nodes and if your model/lora requires third-party Lora Loaders then it won't work and may cause some issues. Ex: Nunchaku models require Nunchaku Lora Loaders.
+
+
+## Hotkeys/Shortcuts/Misc:
+#     - CTRL + Left Mouse Click on a (valid) Lora pattern -> opens a new window of Windows Explorer at the location of that LoRA with it pre-selected
+#     - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)
+#     - Adjust Font Size with CTRL + Mouse Wheel Up/Down 
+#     - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
+
+## TIPS:
+#     - This node is (accidentally) fully compatible with subgraphs. This means you can actually add the 'prompt area' as a widget to the subgraph's widgets!
+#          To do so: place the node inside a subgraph then outside the subgraph -> right click on it -> Edit subgraph widgets -> Search 'basic dynamic' and turn the visibility ON for 'richprompt_widget_-1'
 
 
 ## Advanced example:
@@ -508,10 +511,16 @@ def dynamic_prompts(
     )
     
     return prompt
-    
-    
+
+
+class LoraLoadMode(Enum):
+    Default = 1
+    VisualOnly = 2
+    AudioOnly = 3
+
+
 class Lora:
-    def __init__(self, name: str, prompt_name: str, lora_path: str, model_weight: float, clip_weight: float, load_on_model_A: bool, load_on_model_B: bool):
+    def __init__(self, name: str, prompt_name: str, lora_path: str, model_weight: float, clip_weight: float, load_on_model_A: bool, load_on_model_B: bool, load_mode: LoraLoadMode):
         self.Name = name
         self.PromptName = prompt_name
         self.LoraPath = lora_path
@@ -519,6 +528,7 @@ class Lora:
         self.ClipWeight = clip_weight
         self.LoadOnModel_A = load_on_model_A
         self.LoadOnModel_B = load_on_model_B
+        self.LoadMode = LoraLoadMode.Default
 
 
 def get_available_loras_stem() -> str:
@@ -534,7 +544,7 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
     
     # outputs
     loras_to_load: List[Lora] = []
-    all_patterns = re.findall(r'<(?:lora|lora_a|lora_b):[^>]+>', prompt, re.IGNORECASE)
+    all_patterns = re.findall(r'<(?:lora|lora_a|lora_b|lora_visual|lora_a_visual|lora_b_visual|lora_audio|lora_a_audio|lora_b_audio):[^>]+>', prompt, re.IGNORECASE)
     loras_A_to_load_patterns: List[str] = []
     loras_B_to_load_patterns: List[str] = []
     not_found_lora_names: List[str] = []
@@ -544,12 +554,14 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
     
     lora_files = folder_paths.get_filename_list("loras")    
     
-    pattern = r'<(lora|lora_a|lora_b):([^:>]+)(?::(\d+\.?\d*))?(?::(\d+\.?\d*))?>'
+    pattern = r'<(lora|lora_a|lora_b|lora_visual|lora_a_visual|lora_b_visual|lora_audio|lora_a_audio|lora_b_audio):([^:>]+)(?::(\d+\.?\d*))?(?::(\d+\.?\d*))?>'
     matches = re.findall(pattern, prompt, re.IGNORECASE)
     
     for prefix, name_in_prompt, model_w_str, clip_w_str in matches:
-        load_on_model_A = prefix.lower() != 'lora_b'
-        load_on_model_B = prefix.lower() != 'lora_a'
+        load_on_model_A = 'lora_b' not in prefix.lower()
+        load_on_model_B = 'lora_a' not in prefix.lower()
+        
+        loadMode = LoraLoadMode.Default if "visual" not in prefix.lower() and "audio" not in prefix.lower() else LoraLoadMode.VisualOnly if "visual" in prefix.lower() else LoraLoadMode.AudioOnly
         
         lora_found_name = ""
         lora_path = ""
@@ -588,7 +600,8 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
                         model_weight=model_weight,
                         clip_weight=clip_weight,
                         load_on_model_A=load_on_model_A,
-                        load_on_model_B=load_on_model_B
+                        load_on_model_B=load_on_model_B,
+                        load_mode=loadMode
                     )
                 else:
                     existing_lora = lora_A_map[lora_path]
@@ -605,7 +618,8 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
                         model_weight=model_weight,
                         clip_weight=clip_weight,
                         load_on_model_A=load_on_model_A,
-                        load_on_model_B=load_on_model_B
+                        load_on_model_B=load_on_model_B,
+                        load_mode=loadMode
                     )
                 else:
                     existing_lora = lora_B_map[lora_path]
@@ -653,6 +667,19 @@ def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], 
     
     return loras_to_load, all_patterns, loras_A_to_load_patterns, loras_B_to_load_patterns, not_found_lora_names
 
+def get_lora_state_dict(lora: Lora):
+    lora_weights = load_torch_file(lora.LoraPath, safe_load=True)
+    if lora.LoadMode == LoraLoadMode.Default:
+        return lora_weights
+    else:
+        audio_weights = {}
+        visual_weights = {}
+        for key, tensor in lora_weights.items():
+            if any(x in key.lower() for x in ["audio", "vocoder", "speech", "sound", "music"]):
+                audio_weights[key] = tensor
+            else:
+                visual_weights[key] = tensor
+        return visual_weights if lora.LoadMode == LoraLoadMode.VisualOnly else audio_weights
 
 
 class SILVER_BasicDynamicPrompts:    
@@ -717,9 +744,17 @@ wildcard_directory: The directory where TXT wildcard files are stored.
             for lora in loras_to_load:
                 try:
                     if lora.LoadOnModel_A and (model_A_optional or clip_A_optional):
-                        model_A_optional, clip_A_optional = load_lora_for_models(model_A_optional, clip_A_optional, load_torch_file(lora.LoraPath, safe_load=True), lora.ModelWeight, lora.ClipWeight)
+                        lora_state_dict = get_lora_state_dict(lora)
+                        if len(lora_state_dict) > 0:
+                            model_A_optional, clip_A_optional = load_lora_for_models(model_A_optional, clip_A_optional, lora_state_dict, lora.ModelWeight, lora.ClipWeight)
+                        else:
+                            print(f"[SILVER_BasicDynamicPrompts] WARNING: No weights selected for: {lora.Name} with: {lora.LoadMode}")
                     if lora.LoadOnModel_B and (model_B_optional or clip_B_optional):
-                        model_B_optional, clip_B_optional = load_lora_for_models(model_B_optional, clip_B_optional, load_torch_file(lora.LoraPath, safe_load=True), lora.ModelWeight, lora.ClipWeight)
+                        lora_state_dict = get_lora_state_dict(lora)
+                        if len(lora_state_dict) > 0:
+                            model_B_optional, clip_B_optional = load_lora_for_models(model_B_optional, clip_B_optional, lora_state_dict, lora.ModelWeight, lora.ClipWeight)
+                        else:
+                            print(f"[SILVER_BasicDynamicPrompts] WARNING: No weights selected for: {lora.Name} with: {lora.LoadMode}")
                 except:
                     warning_suffix = "both model/clip A and B" if (lora.LoadOnModel_A and lora.LoadOnModel_B) else "model/clip A" if lora.LoadOnModel_A else "model/clip B"
                     print(f"[SILVER_BasicDynamicPrompts] WARNING: Failed to load lora: {lora.Name} on {warning_suffix}")

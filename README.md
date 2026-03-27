@@ -5,6 +5,9 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 
 
 # Changelog
+- v3.4.0
+  - Added the ability to specify audio-only/visual-only weights when loading a lora from prompt - read more in the instructions provided when you place a new node in a workflow.
+
 - v3.3.0
   - Fixed loras not loading in some cases when their filenames contain dots '.'
   - Fixed a bug that occasionally caused the cursor style to change when hovering over the node's prompt editor

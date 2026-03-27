@@ -3,7 +3,6 @@ import { PreviewTooltip } from "../widgets/loras_widget_components.js";
 
 app.registerExtension({
     name: "Comfy.SILVER_BasicDynamicPrompts",
-	
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         if (nodeData.name !== "SILVER_BasicDynamicPrompts") return;
 		
@@ -71,10 +70,10 @@ app.registerExtension({
 			});
 			
 			// LoRA
-			work = work.replace(/<(lora|lora_a|lora_b):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi, (match, prefix, name) => {
+			work = work.replace(/<(lora|lora_a|lora_b|lora_visual|lora_a_visual|lora_b_visual|lora_audio|lora_a_audio|lora_b_audio):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi, (match, prefix, name) => {
 				let baseColor;
-				if (prefix.toLowerCase() === "lora_a") baseColor = "#ADFF2F";
-				else if (prefix.toLowerCase() === "lora_b") baseColor = "#7FFFD4";
+				if (prefix.toLowerCase().endsWith("_a") || prefix.toLowerCase().indexOf("_a_") !== -1) baseColor = "#ADFF2F";
+				else if (prefix.toLowerCase().endsWith("_b") || prefix.toLowerCase().indexOf("_b_") !== -1) baseColor = "#7FFFD4";
 				else baseColor = "#F4A460";
 		
 				const tagColor = availableLorasLowercase.includes(name.trim().toLowerCase()) ? baseColor : "#FF4444";
@@ -606,7 +605,7 @@ app.registerExtension({
 				
 			
 				// LoRA regex (same as highlight)
-				const loraRegex = /<(lora|lora_a|lora_b):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi;
+				const loraRegex = /<(lora|lora_a|lora_b|lora_visual|lora_a_visual|lora_b_visual|lora_audio|lora_a_audio|lora_b_audio):([^:\n\r>]+)(?::[^\n\r>]*)?>/gi;
 				let foundLora = null;
 				let lm;
 				while ((lm = loraRegex.exec(fullText)) !== null) {

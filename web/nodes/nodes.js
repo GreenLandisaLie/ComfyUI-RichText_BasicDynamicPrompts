@@ -32,8 +32,6 @@ app.registerExtension({
 		let hovered_lora_content = "";
 		let wildcard_files = [];
 		
-		let editor_ref = null;
-		
         // Advanced syntax highlighting with fixed comment typing behavior
 		const highlight = (text) => {			
 			let work = text;

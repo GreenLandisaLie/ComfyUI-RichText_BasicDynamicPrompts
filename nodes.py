@@ -92,6 +92,7 @@ DEFAULT_PROMPT = r"""### Instructions and Tips
 #     - CTRL + Left Mouse Click on a Yellow wildcard -> opens the file with your default text editor (Notepad++ recommended)
 #     - Adjust Font Size with CTRL + Mouse Wheel Up/Down 
 #     - Placing the mouse over Lora patterns will now display a preview tooltip with an image/video IF you have 'willmiao/ComfyUI-Lora-Manager' installed and its managing your loras.
+#     - CTRL + UP/DOWN (on selected text) mimics ComfyUI's fast text weighting
 
 ## TIPS:
 #     - This node is (accidentally) fully compatible with subgraphs. This means you can actually add the 'prompt area' as a widget to the subgraph's widgets!
@@ -531,9 +532,9 @@ class Lora:
         self.LoadMode = LoraLoadMode.Default
 
 
-def get_available_loras_stem() -> str:
-    loras = folder_paths.get_filename_list("loras")
-    return ",".join([Path(f).stem for f in loras])
+def get_available_loras_stem():
+    lora_paths = folder_paths.get_filename_list("loras")
+    return [Path(f).stem for f in lora_paths]
 
 def parse_lora_patterns(prompt: str) -> Tuple[List[Lora], List[str], List[str], List[str], List[str]]:
     """
@@ -687,7 +688,6 @@ class SILVER_BasicDynamicPrompts:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "available_loras_stem": ("STRING", {"default": get_available_loras_stem()}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff, "tooltip": "Giving the same seed and the exact same prompt will always return the same (output) prompt"}),
                 "line_suffix": ("STRING", {"multiline": False, "default": "", "dynamicPrompts": False, "tooltip": "Appends this string to the end of every line. Useful to automate suffixing of tags and descriptive text with either commas or single dots."}),
                 "single_line_output": ("BOOLEAN", {"default": True, "tooltip": "This must be True for multi-line combinations to work."}),
@@ -734,7 +734,7 @@ remove_loras_pattern: Removes every lora pattern found from the output prompt. Y
 wildcard_directory: The directory where TXT wildcard files are stored.
 """
 
-    def main(self, available_loras_stem, seed, line_suffix, single_line_output, remove_whitespaces, remove_empty_tags, load_loras_from_prompt, remove_loras_pattern, wildcard_directory, model_A_optional=None, clip_A_optional=None, model_B_optional=None, clip_B_optional=None, prompt=DEFAULT_PROMPT):
+    def main(self, seed, line_suffix, single_line_output, remove_whitespaces, remove_empty_tags, load_loras_from_prompt, remove_loras_pattern, wildcard_directory, model_A_optional=None, clip_A_optional=None, model_B_optional=None, clip_B_optional=None, prompt=DEFAULT_PROMPT):
         
         dp = dynamic_prompts(prompt = prompt, seed = seed, line_suffix = line_suffix, single_line_output = single_line_output, remove_whitespaces = remove_whitespaces, remove_empty_tags = remove_empty_tags, wildcard_dir = wildcard_directory)
         
@@ -775,6 +775,13 @@ wildcard_directory: The directory where TXT wildcard files are stored.
         
         return (model_A_optional, clip_A_optional, model_B_optional, clip_B_optional, dp, prompt, loaded_lora_patterns_A, loaded_lora_patterns_B, loras_names_not_found)
 
+
+
+@PromptServer.instance.routes.post("/silver_basicdynamicprompts/get_available_loras")
+async def get_available_loras(request):
+    data = await request.json()
+    available_loras = get_available_loras_stem()
+    return web.json_response({"available_loras": available_loras})
 
 
 @PromptServer.instance.routes.post("/silver_basicdynamicprompts/get_wildcard_files")

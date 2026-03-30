@@ -1,6 +1,23 @@
 import { app } from "../../../scripts/app.js";
 import { PreviewTooltip } from "../widgets/loras_widget_components.js";
 
+
+// Note: trying to block/bypass ComfyUI's native node CTRL+UP/DOWN/LEFT/RIGHT shortcuts does not work from within editor. Doing a global window listener and blocking it this way works
+if (!window.comfy_silver_weight_listener_added) {
+    window.addEventListener("keydown", (e) => {
+        const el = document.activeElement;
+        if (el && typeof el.silverTextWeighting === "function") {
+            if ((e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") && (e.ctrlKey || e.metaKey)) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                if (e.key === "ArrowUp" || e.key === "ArrowDown") el.silverTextWeighting(e);
+            }
+        }
+    }, true); 
+    window.comfy_silver_weight_listener_added = true;
+}
+
+
 app.registerExtension({
     name: "Comfy.SILVER_BasicDynamicPrompts",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
@@ -14,6 +31,8 @@ app.registerExtension({
 		let hovered_wildcard_content = "";
 		let hovered_lora_content = "";
 		let wildcard_files = [];
+		
+		let editor_ref = null;
 		
         // Advanced syntax highlighting with fixed comment typing behavior
 		const highlight = (text) => {			
@@ -175,6 +194,42 @@ app.registerExtension({
             }
         };
         
+		// Used for text selection + CTRL+UP/DOWN
+		const setPlainSelectionRange = (editor, startOffset, endOffset) => {
+			const sel = window.getSelection();
+			const range = document.createRange();
+			let currentOffset = 0;
+			let startNode, startNodeOffset, endNode, endNodeOffset;
+		
+			const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
+			let node;
+		
+			while ((node = walker.nextNode())) {
+				const nodeLength = node.textContent.length;
+		
+				// Find Start
+				if (!startNode && currentOffset + nodeLength >= startOffset) {
+					startNode = node;
+					startNodeOffset = startOffset - currentOffset;
+				}
+				// Find End
+				if (!endNode && currentOffset + nodeLength >= endOffset) {
+					endNode = node;
+					endNodeOffset = endOffset - currentOffset;
+				}
+		
+				currentOffset += nodeLength;
+				if (startNode && endNode) break;
+			}
+		
+			if (startNode && endNode) {
+				range.setStart(startNode, startNodeOffset);
+				range.setEnd(endNode, endNodeOffset);
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+		};
+		
 		// EX: 'aaa ### bbb ###### ccc' -> 'aaa ### bbb # ccc'
 		const fixCommentBody = (text) => {
 			// Split the input text into individual lines
@@ -219,6 +274,7 @@ app.registerExtension({
 			return fixedLines.join('\n');
 		};
 		
+		
 		async function get_wildcard_files() {
 			const resp = await fetch("/silver_basicdynamicprompts/get_wildcard_files", {
 				method: "POST",
@@ -228,8 +284,19 @@ app.registerExtension({
 			const data = await resp.json();
 			wildcard_files = data.wildcard_files || [];
 		};
+		
+		async function get_available_loras() {
+			const resp = await fetch("/silver_basicdynamicprompts/get_available_loras", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({})
+			});
+			const data = await resp.json();
+			availableLoras = data.available_loras || [];
+			availableLorasLowercase = availableLoras.map(stem => stem.toLowerCase());
+		};
 		// --- [End of helper functions] ---
-
+		
 
         const origOnNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function() {
@@ -259,14 +326,7 @@ app.registerExtension({
             // ---------------------------
 			
 			// --- 1. GET AVAILABLE LORAS ---
-            const available_loras_stem_widget = this.widgets?.find(w => w.name === "available_loras_stem");
-			available_loras_stem_widget.computeSize = () => [0, 0];
-			available_loras_stem_widget.y = -1000;
-			available_loras_stem_widget.hidden = true;
-			
-			availableLoras = available_loras_stem_widget.value.split(',');
-			availableLorasLowercase = available_loras_stem_widget.value.split(',').map(stem => stem.toLowerCase());
-			
+			get_available_loras();
 			
 			// --- 2. SETUP PROMPT WIDGET AND CUSTOM EDITOR ---
             const prompt_widget = this.widgets?.find(w => w.name === "prompt");
@@ -324,12 +384,12 @@ app.registerExtension({
 			
             // Stop ComfyUI shortcuts
             editor.addEventListener("keydown", (e) => {
-				
 				if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) return; // Support for native Ctrl+Enter command
 				
                 e.stopPropagation();
 				
-				if (e.key === 'Tab') { // add text editor behavior with the TAB key but use 4 spaces instead of '\t'
+				// add text editor behavior with the TAB key but use 4 spaces instead of '\t'
+				if (e.key === 'Tab') {
 					e.preventDefault(); // CRITICAL: Stop the browser from blurring the element/changing focus
 			
 					const sel = window.getSelection();
@@ -350,6 +410,7 @@ app.registerExtension({
 					// Set cursor to the position after the inserted characters
 					setPlainCursorPosition(editor, plainOffset + indentation.length); 
 				}
+				
             });
 			
             // Intercept 'Enter' to control newlines and cursor movement
@@ -455,7 +516,6 @@ app.registerExtension({
 					}
 				}
 			});
-			
 			
 			
 			// ----------------------------------------------------
@@ -709,19 +769,65 @@ app.registerExtension({
 				// Prevent the event from bubbling up to the ComfyUI canvas listeners
 				e.stopPropagation();
 				
-				// Optional: Stop the default action, though the browser should handle it
-				// for contentEditable elements correctly if propagation is stopped.
+				// Optional: Stop the default action, though the browser should handle it for contentEditable elements correctly if propagation is stopped.
 				// e.preventDefault(); 
 			};
 			
 			// FIX issue caused by: https://github.com/Comfy-Org/ComfyUI_frontend/pull/6087/files
 			editor.addEventListener("copy", stopPropagation);
 			editor.addEventListener("paste", stopPropagation);
-			editor.addEventListener("cut", stopPropagation);			
-            
+			editor.addEventListener("cut", stopPropagation);
+			
+			
+			
+			
+			// Attach the locals to the element so the global listener can see them - for CTRL+UP/DOWN Text Weighting feature with native shortcut block support
+			editor.prompt_widget = prompt_widget;
+			editor.updateEditorContent = updateEditorContent;
+			editor.setPlainSelectionRange = setPlainSelectionRange; // Make sure this helper is available here
+			editor.getOffsetFromPoint = (container, offset) => {
+				const preRange = document.createRange();
+				preRange.selectNodeContents(editor);
+				preRange.setEnd(container, offset);
+				return preRange.cloneContents().textContent.length;
+			};
+			editor.silverTextWeighting = function(e) {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return;
+			
+				const range = sel.getRangeAt(0);
+				const start = this.getOffsetFromPoint(range.startContainer, range.startOffset);
+				const end = this.getOffsetFromPoint(range.endContainer, range.endOffset);
+			
+				let text = this.innerText;
+				let selectedText = text.substring(start, end);
+				if (!selectedText) return;
+			
+				const delta = e.key === "ArrowUp" ? 0.05 : -0.05;
+				const weightRegex = /^\((.*):([-]?\d+(?:\.\d+)?)\)$/;
+				const match = selectedText.match(weightRegex);
+			
+				let newText;
+				if (match) {
+					const content = match[1];
+					let weight = parseFloat((parseFloat(match[2]) + delta).toFixed(2));
+					newText = weight === 1 ? content : `(${content}:${weight})`;
+				} else {
+					newText = `(${selectedText}:${(1 + delta).toFixed(2)})`;
+				}
+			
+				// Use the attached references
+				this.prompt_widget.value = text.substring(0, start) + newText + text.substring(end);
+				this.updateEditorContent();
+				this.setPlainSelectionRange(this, start, start + newText.length);
+			};
+			
+			
+			
+			
 			
             this.setDirtyCanvas(true, true);
-            
+			
             // cleanup
 			const origOnRemoved = this.onRemoved;
             this.onRemoved = function() {

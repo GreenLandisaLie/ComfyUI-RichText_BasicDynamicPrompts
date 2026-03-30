@@ -7,7 +7,7 @@ A node with basic Dynamic Prompts support that uses javascript to simulate a Ric
 # Changelog
 - v3.5.0
   - Added support for native ComfyUI's CTRL+UP/DOWN text weighting feature
-  - Improved the logic for retrieval of the user's LoRA list to be used in lora pattern highlighting - no longer uses a hidden widget for that so the user's entire LoRA list no longer shows up in a saved workflow. 
+  - Improved the logic for retrieval of the user's LoRA list to be used in lora pattern highlighting - no longer uses a hidden widget for that so the user's entire LoRA list no longer shows up in a saved workflow. EDIT: this will break saved workflows with prior versions of this node until the user updates the inputs manually - I apologize for this but there's nothing I can do about it. I do not plan on adding/removing any more widgets to this node so this will be the last time it happens.
 
 - v3.4.0
   - Added the ability to specify audio-only/visual-only weights when loading a lora from prompt - read more in the instructions provided when you place a new node in a workflow.

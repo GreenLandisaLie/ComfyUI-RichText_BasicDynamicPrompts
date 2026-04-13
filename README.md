@@ -1,6 +1,8 @@
 ## ComfyUI-RichText_BasicDynamicPrompts
 A node with basic Dynamic Prompts support that uses javascript to simulate a Rich Text textbox.
 
+I highly recommend you use it along side the 'CLIP Text Encoder (Prompt) with Cache' node I made here: https://github.com/GreenLandisaLie/ComfyUI-Silver_Pack
+
 <img width="1074" height="1834" alt="1" src="https://github.com/user-attachments/assets/f549e109-dae0-4201-810a-07dd54d19200" />
 
 

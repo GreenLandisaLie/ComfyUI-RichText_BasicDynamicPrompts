@@ -7,6 +7,9 @@ I highly recommend you use it along side the 'CLIP Text Encoder (Prompt) with Ca
 
 
 # Changelog
+- v3.6.0
+  - Fixed a major stupid bug that was preventing 'lora_visual' and 'lora_audio' patterns from working and always defaulting back to normal 'lora' load behavior (all weights).
+
 - v3.5.0
   - Added support for native ComfyUI's CTRL+UP/DOWN text weighting feature
   - Improved the logic for retrieval of the user's LoRA list to be used in lora pattern highlighting - no longer uses a hidden widget for that so the user's entire LoRA list no longer shows up in a saved workflow. EDIT: this will break saved workflows with prior versions of this node until the user updates the inputs manually - I apologize for this but there's nothing I can do about it. I do not plan on adding/removing any more widgets to this node so this will be the last time it happens.

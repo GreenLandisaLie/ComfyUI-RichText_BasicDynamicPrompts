@@ -529,7 +529,7 @@ class Lora:
         self.ClipWeight = clip_weight
         self.LoadOnModel_A = load_on_model_A
         self.LoadOnModel_B = load_on_model_B
-        self.LoadMode = LoraLoadMode.Default
+        self.LoadMode = load_mode
 
 
 def get_available_loras_stem():
